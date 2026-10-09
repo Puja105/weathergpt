@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from backend.database import get_connection
+from backend.chatbot import router as chatbot_router
 
 
 app = FastAPI(
@@ -7,6 +8,8 @@ app = FastAPI(
     description="Weather data API for the WeatherGPT project",
     version="1.0.0"
 )
+
+app.include_router(chatbot_router)
 
 
 # ============================================================
