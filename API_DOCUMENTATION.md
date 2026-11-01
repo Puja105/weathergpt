@@ -509,6 +509,54 @@ For the final project, the API can later be deployed to a server/cloud platform.
 
 FastAPI automatically provides interactive API documentation.
 
+---
+
+# 17. Multilingual Weather Chatbot
+
+The chatbot endpoint understands the question with OpenAI, looks up weather data
+from the existing PostgreSQL tables, and generates an answer grounded in that
+data. It supports current conditions, daily forecasts, and hourly forecasts.
+
+Set `OPENAI_API_KEY` in your `.env` file. `OPENAI_MODEL` is optional and defaults
+to `gpt-4o-mini`. The database connection continues to use the existing
+`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` settings.
+
+Start the API from the project root:
+
+```powershell
+uvicorn backend.main:app --reload
+```
+
+Send a question:
+
+```http
+POST /chat
+Content-Type: application/json
+```
+
+```json
+{
+  "message": "What will the weather be in Bengaluru tomorrow?"
+}
+```
+
+Example response:
+
+```json
+{
+  "answer": "Tomorrow in Bengaluru, expect ..."
+}
+```
+
+The chatbot reads locations from `locations`, current conditions from
+`weather_data`, and forecasts from `hourly_forecast` and `daily_forecast`.
+Forecast questions return only information present in those tables; missing or
+out-of-range forecast data is not fabricated. Use `/docs` to try the endpoint.
+For questions about current heavy-rain risk, the chatbot also uses the existing
+`sahana/models/heavy_rain_model.pkl` classifier with its training features and
+threshold. The model score is an estimate (not a calibrated probability), only
+for current conditions, and not a future forecast.
+
 Open:
 
 http://127.0.0.1:8000/docs
