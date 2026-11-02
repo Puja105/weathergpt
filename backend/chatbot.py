@@ -107,40 +107,70 @@ def _request_openai(messages: list[dict[str, str]], json_response: bool = False)
 
     return content
 
+def _understand_question(
+    message: str,
+    history: Optional[list[ChatMessage]] = None
+) -> WeatherIntent:
 
-def _understand_question(message: str, history: Optional[list[ChatMessage]] = None) -> WeatherIntent:
     today = datetime.now(WEATHER_TIMEZONE).date().isoformat()
+
     messages = [
         {
             "role": "system",
             "content": (
                 "Extract weather request details from the latest user message. "
-                "Return JSON with city (a city name only, or null if absent), "
-                "date (YYYY-MM-DD or null), query_type (current, daily, or hourly), "
+                "Return JSON with these fields: "
+                "city (a city name only, or null if absent), "
+                "date (YYYY-MM-DD or null), "
+                "query_type (MUST be exactly current, daily, or hourly; NEVER null), "
                 "language (the language to use in the answer), and "
                 "include_heavy_rain_risk (true only when the user asks about "
                 "current heavy-rain risk, never for a future forecast). "
-                f"Resolve relative dates using today's date: {today}. "
-                "Choose current for present conditions, hourly when an hour/time-of-day "
-                "or hourly trend is requested, and daily for a date or daily outlook. "
-                "Use prior conversation turns to resolve follow-ups such as 'what about "
-                "tomorrow?' and pronouns. Do not invent a city if it is absent from both "
-                "the latest message and conversation history."
+
+                f"Today's date is {today}. "
+                "Resolve relative dates using today's date. "
+                "Choose current for present conditions or general weather questions, "
+                "hourly when an hour/time-of-day or hourly trend is requested, "
+                "and daily for a date or daily outlook. "
+                "If uncertain, always choose current. "
+
+                "Use prior conversation turns to resolve follow-ups such as "
+                "'what about tomorrow?' and pronouns. "
+                "Do not invent a city if it is absent from both the latest "
+                "message and conversation history."
             ),
         }
     ]
+
     for item in (history or [])[-8:]:
-        messages.append({"role": item.role, "content": item.content})
-    messages.append({"role": "user", "content": message})
+        messages.append({
+            "role": item.role,
+            "content": item.content
+        })
+
+    messages.append({
+        "role": "user",
+        "content": message
+    })
+
     content = _request_openai(messages, json_response=True)
 
     try:
-        return WeatherIntent.model_validate_json(content)
-    except ValidationError as error:
-        logger.exception("OpenAI returned invalid weather request details")
+        data = json.loads(content)
+
+        # Fallback if the model returns null or omits query_type.
+        if data.get("query_type") is None:
+            data["query_type"] = "current"
+
+        return WeatherIntent.model_validate(data)
+
+    except (ValidationError, json.JSONDecodeError, AttributeError) as error:
+
+        logger.exception("OpenRouter returned invalid weather request details")
+
         raise HTTPException(
             status_code=502,
-            detail="The language model could not understand the weather request.",
+            detail="The language model returned invalid weather request details."
         ) from error
 
 
