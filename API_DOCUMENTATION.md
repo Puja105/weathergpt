@@ -629,3 +629,72 @@ Database: PostgreSQL
 Backend: FastAPI
 
 Supported locations: Bengaluru, Mumbai, Delhi, Chennai, Hyderabad
+
+---
+
+# 21. WeatherGPT Chatbot + RAG
+
+## POST /chat
+
+The chatbot extracts the city, requested date, forecast type, and answer language.
+It retrieves weather records from the existing PostgreSQL tables, then searches
+the `weather_documents` pgvector table for relevant reference material. The LLM
+combines these sources to answer the question.
+
+### Request
+
+```json
+{
+  "message": "Will it rain in Bengaluru tomorrow?",
+  "history": [
+    {"role": "user", "content": "What's the weather in Bengaluru?"},
+    {"role": "assistant", "content": "The latest stored conditions are ..."}
+  ]
+}
+```
+
+`history` is optional and supports up to 12 prior user/assistant messages. Send
+the newest question in `message`.
+
+### Response
+
+```json
+{
+  "answer": "The generated weather answer...",
+  "sources": [
+    {
+      "title": "India Weather Warnings",
+      "source": "knowledge_base/india_weather_warnings.md",
+      "similarity": 0.78
+    }
+  ]
+}
+```
+
+The `sources` array contains reference-document chunks retrieved from pgvector.
+Weather observations and forecasts continue to come from `weather_data`,
+`hourly_forecast`, and `daily_forecast`; RAG documents are not live forecasts.
+
+## RAG setup
+
+Run once from the project root:
+
+```bash
+python -m backend.setup_rag
+python -m backend.ingest_documents --path knowledge_base
+```
+
+Neon must have the PostgreSQL `vector` extension enabled. The project uses
+`text-embedding-3-small` (1536 dimensions) by default. If you change the embedding
+model/dimension, update the SQL column dimension and re-ingest every document.
+
+Supported ingestion formats: Markdown (`.md`), text (`.txt`), and CSV (`.csv`).
+
+## Built-in chat interface
+
+Start FastAPI and open:
+
+http://127.0.0.1:8000/app
+
+The interface sends conversation history to `POST /chat` and displays retrieved
+document titles with the answer.

@@ -1,19 +1,21 @@
+"""Manual Open-Meteo smoke test: run with `python -m backend.test_weather`."""
 from backend.weather_api import get_weather
 from backend.locations import LOCATIONS
 
 
-for location in LOCATIONS:
+def main():
+    for location in LOCATIONS:
+        data = get_weather(
+            latitude=location["latitude"],
+            longitude=location["longitude"],
+        )
+        current = data["current"]
+        print(
+            f"{location['city']}: {current['temperature_2m']} °C, "
+            f"humidity {current['relative_humidity_2m']}%, "
+            f"wind {current['wind_speed_10m']} km/h"
+        )
 
-    data = get_weather(
-        latitude=location["latitude"],
-        longitude=location["longitude"]
-    )
 
-    current = data["current"]
-
-    print("\n-----------------------------")
-    print(f"City: {location['city']}")
-    print(f"Temperature: {current['temperature_2m']} °C")
-    print(f"Humidity: {current['relative_humidity_2m']} %")
-    print(f"Wind Speed: {current['wind_speed_10m']} km/h")
-    print(f"Rain: {current['rain']} mm")
+if __name__ == "__main__":
+    main()

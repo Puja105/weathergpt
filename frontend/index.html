@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b2d">
+  <title>WeatherGPT — Weather, explained</title>
+  <link rel="stylesheet" href="/app/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/app">
+        <span class="brand-mark">☁</span>
+        <span><strong>WeatherGPT</strong><small>Weather, explained.</small></span>
+      </a>
+      <span class="status"><i></i> AI WEATHER ASSISTANT</span>
+    </header>
+
+    <section class="intro" id="intro">
+      <div class="eyebrow">YOUR WEATHER COMPANION</div>
+      <h1>Ask the sky<br><span>anything.</span></h1>
+      <p>Get weather answers in plain language, backed by forecast data and trusted reference information.</p>
+      <div class="suggestions">
+        <button class="suggestion" data-prompt="What's the current weather in Bengaluru?">Current weather in Bengaluru <b>↗</b></button>
+        <button class="suggestion" data-prompt="Will it rain in Mumbai tomorrow?">Will it rain tomorrow in Mumbai? <b>↗</b></button>
+        <button class="suggestion" data-prompt="Explain the IMD orange and red weather warnings.">Explain IMD warning colours <b>↗</b></button>
+      </div>
+    </section>
+
+    <section class="chat-panel" aria-label="WeatherGPT conversation">
+      <div class="chat-heading">
+        <div><span class="live-dot"></span><strong>WeatherGPT assistant</strong></div>
+        <button id="clear-chat" class="clear-button" type="button">New chat ↻</button>
+      </div>
+      <div id="messages" class="messages" aria-live="polite">
+        <article class="message assistant">
+          <div class="avatar">W</div>
+          <div class="bubble">
+            <p>Hi! I'm WeatherGPT. Ask me about current conditions, hourly or daily forecasts, rainfall risk, or weather safety. Which city are you interested in?</p>
+          </div>
+        </article>
+      </div>
+      <form id="chat-form" class="composer">
+        <label class="sr-only" for="message-input">Ask a weather question</label>
+        <textarea id="message-input" rows="1" maxlength="2000" placeholder="Ask about the weather in a city..." required></textarea>
+        <button id="send-button" type="submit" aria-label="Send message">↑</button>
+      </form>
+      <p class="disclaimer">WeatherGPT uses available project weather data. Always follow current official alerts and local authorities.</p>
+    </section>
+    <footer>WEATHERGPT <span>•</span> POWERED BY WEATHER DATA + RETRIEVAL-AUGMENTED AI</footer>
+  </main>
+  <script src="/app/app.js"></script>
+</body>
+</html>
