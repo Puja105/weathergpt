@@ -3,26 +3,31 @@ from datetime import datetime
 from backend.database import get_connection
 from backend.forecast_api import get_forecast
 from backend.locations import LOCATIONS
+
 def save_forecast_data():
 
-    connection = get_connection()
+    for location in LOCATIONS:
 
-    try:
+        print(f"\nFetching forecast for {location['city']}...")
 
-        cursor = connection.cursor()
-
-        for location in LOCATIONS:
-
-            print(
-                f"\nFetching forecast for {location['city']}..."
-            )
-
+        # STEP 1: Fetch weather before connecting to Neon
+        try:
             data = get_forecast(
                 latitude=location["latitude"],
                 longitude=location["longitude"]
             )
 
-            location_id = None
+        except Exception as error:
+            print(f"Error fetching {location['city']}: {error}")
+            continue
+
+        connection = None
+        cursor = None
+
+        try:
+            # STEP 2: Open a database connection for this city
+            connection = get_connection()
+            cursor = connection.cursor()
 
             cursor.execute(
                 """
@@ -36,24 +41,17 @@ def save_forecast_data():
             result = cursor.fetchone()
 
             if result is None:
-                print(
-                    f"Location not found: {location['city']}"
-                )
+                print(f"Location not found: {location['city']}")
                 continue
 
             location_id = result[0]
 
-            # -----------------------------
-            # SAVE CURRENT WEATHER
-            # -----------------------------
+            # STEP 3: SAVE CURRENT WEATHER
 
             current = data["current"]
 
-            recorded_at = datetime.fromisoformat(
-                current["time"]
-            )
+            recorded_at = datetime.fromisoformat(current["time"])
 
-            # Check whether this observation already exists
             cursor.execute(
                 """
                 SELECT weather_id
@@ -68,7 +66,6 @@ def save_forecast_data():
 
             if existing_weather:
 
-                # Update an existing observation
                 cursor.execute(
                     """
                     UPDATE weather_data
@@ -100,7 +97,6 @@ def save_forecast_data():
 
             else:
 
-                # Insert a new observation
                 cursor.execute(
                     """
                     INSERT INTO weather_data
@@ -134,22 +130,15 @@ def save_forecast_data():
                     )
                 )
 
-            print(
-                f"Current weather saved for {location['city']} "
-                f"({recorded_at})"
-            )
+            print(f"Current weather saved for {location['city']} ({recorded_at})")
 
-            # -----------------------------
-            # SAVE HOURLY FORECAST
-            # -----------------------------
+            # STEP 4: SAVE HOURLY FORECAST
 
             hourly = data["hourly"]
 
             for i in range(len(hourly["time"])):
 
-                forecast_time = datetime.fromisoformat(
-                    hourly["time"][i]
-                )
+                forecast_time = datetime.fromisoformat(hourly["time"][i])
 
                 cursor.execute(
                     """
@@ -165,43 +154,16 @@ def save_forecast_data():
                         wind_speed_kmh,
                         wind_direction_degree
                     )
-                    VALUES
-                    (
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s
-                    )
-
-                    ON CONFLICT
-                    (location_id, forecast_time)
-
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (location_id, forecast_time)
                     DO UPDATE SET
-                        temperature_c =
-                            EXCLUDED.temperature_c,
-
-                        humidity_percent =
-                            EXCLUDED.humidity_percent,
-
-                        precipitation_mm =
-                            EXCLUDED.precipitation_mm,
-
-                        rain_mm =
-                            EXCLUDED.rain_mm,
-
-                        weather_code =
-                            EXCLUDED.weather_code,
-
-                        wind_speed_kmh =
-                            EXCLUDED.wind_speed_kmh,
-
-                        wind_direction_degree =
-                            EXCLUDED.wind_direction_degree;
+                        temperature_c = EXCLUDED.temperature_c,
+                        humidity_percent = EXCLUDED.humidity_percent,
+                        precipitation_mm = EXCLUDED.precipitation_mm,
+                        rain_mm = EXCLUDED.rain_mm,
+                        weather_code = EXCLUDED.weather_code,
+                        wind_speed_kmh = EXCLUDED.wind_speed_kmh,
+                        wind_direction_degree = EXCLUDED.wind_direction_degree;
                     """,
                     (
                         location_id,
@@ -216,9 +178,7 @@ def save_forecast_data():
                     )
                 )
 
-            # -----------------------------
-            # SAVE DAILY FORECAST
-            # -----------------------------
+            # STEP 5: SAVE DAILY FORECAST
 
             daily = data["daily"]
 
@@ -240,43 +200,16 @@ def save_forecast_data():
                         rain_sum_mm,
                         weather_code
                     )
-                    VALUES
-                    (
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s
-                    )
-
-                    ON CONFLICT
-                    (location_id, forecast_date)
-
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (location_id, forecast_date)
                     DO UPDATE SET
-                        temperature_max_c =
-                            EXCLUDED.temperature_max_c,
-
-                        temperature_min_c =
-                            EXCLUDED.temperature_min_c,
-
-                        apparent_temperature_max_c =
-                            EXCLUDED.apparent_temperature_max_c,
-
-                        apparent_temperature_min_c =
-                            EXCLUDED.apparent_temperature_min_c,
-
-                        precipitation_sum_mm =
-                            EXCLUDED.precipitation_sum_mm,
-
-                        rain_sum_mm =
-                            EXCLUDED.rain_sum_mm,
-
-                        weather_code =
-                            EXCLUDED.weather_code;
+                        temperature_max_c = EXCLUDED.temperature_max_c,
+                        temperature_min_c = EXCLUDED.temperature_min_c,
+                        apparent_temperature_max_c = EXCLUDED.apparent_temperature_max_c,
+                        apparent_temperature_min_c = EXCLUDED.apparent_temperature_min_c,
+                        precipitation_sum_mm = EXCLUDED.precipitation_sum_mm,
+                        rain_sum_mm = EXCLUDED.rain_sum_mm,
+                        weather_code = EXCLUDED.weather_code;
                     """,
                     (
                         location_id,
@@ -291,28 +224,32 @@ def save_forecast_data():
                     )
                 )
 
-            print(
-                f"Forecast saved for {location['city']}"
-            )
+            print(f"Forecast saved for {location['city']}")
 
-        connection.commit()
+            # STEP 6: COMMIT THIS CITY
+            connection.commit()
 
-        print(
-            "\nForecast data ingestion completed successfully."
-        )
+            print(f"Database changes committed for {location['city']}")
 
-    except Exception as error:
+        except Exception as error:
 
-        connection.rollback()
+            print(f"Error processing {location['city']}: {error}")
 
-        print(
-            f"\nError while inserting forecast data: {error}"
-        )
+            if connection is not None and not connection.closed:
+                try:
+                    connection.rollback()
+                except Exception as rollback_error:
+                    print(f"Rollback failed: {rollback_error}")
 
-    finally:
+        finally:
 
-        cursor.close()
-        connection.close()
+            if cursor is not None:
+                cursor.close()
+
+            if connection is not None:
+                connection.close()
+
+    print("\nForecast data ingestion completed.")
 
 
 if __name__ == "__main__":

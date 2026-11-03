@@ -1,4 +1,6 @@
+
 import requests
+import time
 
 
 def get_forecast(latitude: float, longitude: float):
@@ -42,19 +44,85 @@ def get_forecast(latitude: float, longitude: float):
         ),
 
         "timezone": "Asia/Kolkata",
-
         "forecast_days": 7
     }
 
-    response = requests.get(
-        url,
-        params=params,
-        timeout=300
+    max_attempts = 3
+
+    for attempt in range(1, max_attempts + 1):
+
+        try:
+
+            print(f"API request attempt {attempt}/{max_attempts}")
+
+            response = requests.get(
+                url,
+                params=params,
+                timeout=120
+            )
+
+            response.raise_for_status()
+
+            return response.json()
+
+        except (requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError) as error:
+
+            print(f"Request failed: {error}")
+
+            if attempt == max_attempts:
+                raise
+
+            wait_time = 5 * attempt
+
+            print(f"Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+
+
+if __name__ == "__main__":
+
+    data = get_forecast(
+        latitude=12.9716,
+        longitude=77.5946
     )
 
-    response.raise_for_status()
+    print("\nCURRENT WEATHER")
+    print(data["current"])
 
-    return response.json()
+    print("\nHOURLY FORECAST")
+
+    hourly = data["hourly"]
+
+    for i in range(5):
+
+        print(
+            hourly["time"][i],
+            "|",
+            hourly["temperature_2m"][i],
+            "°C |",
+            hourly["relative_humidity_2m"][i],
+            "% humidity |",
+            hourly["rain"][i],
+            "mm rain"
+        )
+
+    print("\nDAILY FORECAST")
+
+    daily = data["daily"]
+
+    for i in range(len(daily["time"])):
+
+        print(
+            daily["time"][i],
+            "| Max:",
+            daily["temperature_2m_max"][i],
+            "°C | Min:",
+            daily["temperature_2m_min"][i],
+            "°C | Rain:",
+            daily["rain_sum"][i],
+            "mm"
+        )
+
 
 
 if __name__ == "__main__":
