@@ -49,7 +49,7 @@ def get_forecast(latitude: float, longitude: float):
     response = requests.get(
         url,
         params=params,
-        timeout=30
+        timeout=120
     )
 
     response.raise_for_status()
