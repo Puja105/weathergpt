@@ -44,6 +44,102 @@ def save_forecast_data():
             location_id = result[0]
 
             # -----------------------------
+            # SAVE CURRENT WEATHER
+            # -----------------------------
+
+            current = data["current"]
+
+            recorded_at = datetime.fromisoformat(
+                current["time"]
+            )
+
+            # Check whether this observation already exists
+            cursor.execute(
+                """
+                SELECT weather_id
+                FROM weather_data
+                WHERE location_id = %s
+                AND recorded_at = %s;
+                """,
+                (location_id, recorded_at)
+            )
+
+            existing_weather = cursor.fetchone()
+
+            if existing_weather:
+
+                # Update an existing observation
+                cursor.execute(
+                    """
+                    UPDATE weather_data
+                    SET
+                        temperature_c = %s,
+                        humidity_percent = %s,
+                        apparent_temperature_c = %s,
+                        precipitation_mm = %s,
+                        rain_mm = %s,
+                        weather_code = %s,
+                        cloud_cover_percent = %s,
+                        wind_speed_kmh = %s,
+                        wind_direction_degree = %s
+                    WHERE weather_id = %s;
+                    """,
+                    (
+                        current["temperature_2m"],
+                        current["relative_humidity_2m"],
+                        current["apparent_temperature"],
+                        current["precipitation"],
+                        current["rain"],
+                        current["weather_code"],
+                        current["cloud_cover"],
+                        current["wind_speed_10m"],
+                        current["wind_direction_10m"],
+                        existing_weather[0]
+                    )
+                )
+
+            else:
+
+                # Insert a new observation
+                cursor.execute(
+                    """
+                    INSERT INTO weather_data
+                    (
+                        location_id,
+                        recorded_at,
+                        temperature_c,
+                        humidity_percent,
+                        apparent_temperature_c,
+                        precipitation_mm,
+                        rain_mm,
+                        weather_code,
+                        cloud_cover_percent,
+                        wind_speed_kmh,
+                        wind_direction_degree
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                    """,
+                    (
+                        location_id,
+                        recorded_at,
+                        current["temperature_2m"],
+                        current["relative_humidity_2m"],
+                        current["apparent_temperature"],
+                        current["precipitation"],
+                        current["rain"],
+                        current["weather_code"],
+                        current["cloud_cover"],
+                        current["wind_speed_10m"],
+                        current["wind_direction_10m"]
+                    )
+                )
+
+            print(
+                f"Current weather saved for {location['city']} "
+                f"({recorded_at})"
+            )
+
+            # -----------------------------
             # SAVE HOURLY FORECAST
             # -----------------------------
 
