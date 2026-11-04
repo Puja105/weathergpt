@@ -1,700 +1,134 @@
 # WeatherGPT API Documentation
 
-## 1. Overview
+Base URL for local development: `http://127.0.0.1:8000`
 
-This API provides weather information for the WeatherGPT project.
+Interactive Swagger documentation: `http://127.0.0.1:8000/docs`
 
-The API retrieves weather data stored in PostgreSQL and makes it available through FastAPI endpoints.
+## Health
 
----
+### `GET /`
 
-## 2. Base URL
+Returns a simple service message.
 
-When running locally:
+### `GET /health`
 
-http://127.0.0.1:8000
-
-Swagger API documentation:
-
-http://127.0.0.1:8000/docs
-
----
-
-# 3. Available Endpoints
-
-## 3.1 Root
-
-### Endpoint
-
-GET /
-
-### Purpose
-
-Checks whether the WeatherGPT API is running.
-
-### Example
-
-GET http://127.0.0.1:8000/
-
-### Example Response
-
-{
-    "message": "WeatherGPT API is running"
-}
-
----
-
-# 4. Cities
-
-## Endpoint
-
-GET /cities
-
-### Purpose
-
-Returns the list of supported cities.
-
-### Example
-
-GET http://127.0.0.1:8000/cities
-
-### Example Response
-
-[
-    {
-        "city": "Bengaluru",
-        "state": "Karnataka",
-        "country": "India"
-    },
-    {
-        "city": "Mumbai",
-        "state": "Maharashtra",
-        "country": "India"
-    },
-    {
-        "city": "Delhi",
-        "state": "Delhi",
-        "country": "India"
-    },
-    {
-        "city": "Chennai",
-        "state": "Tamil Nadu",
-        "country": "India"
-    },
-    {
-        "city": "Hyderabad",
-        "state": "Telangana",
-        "country": "India"
-    }
-]
-
----
-
-# 5. Current Weather
-
-## Endpoint
-
-GET /weather/current/{city}
-
-### Purpose
-
-Returns the latest weather data available for a city.
-
-### Example
-
-GET /weather/current/Bengaluru
-
-### Full URL
-
-http://127.0.0.1:8000/weather/current/Bengaluru
-
-### Example Response
-
-{
-    "city": "Bengaluru",
-    "state": "Karnataka",
-    "country": "India",
-    "recorded_at": "...",
-    "temperature_c": 25.0,
-    "humidity_percent": 70,
-    "apparent_temperature_c": 26.0,
-    "precipitation_mm": 0.0,
-    "rain_mm": 0.0,
-    "weather_code": 1,
-    "cloud_cover_percent": 20,
-    "wind_speed_kmh": 10.0,
-    "wind_direction_degree": 180
-}
-
-### Useful for
-
-- Chatbot
-- Frontend
-- Current weather cards
-- Voice assistant
-- Weather summaries
-
----
-
-# 6. Hourly Forecast
-
-## Endpoint
-
-GET /forecast/hourly/{city}
-
-### Purpose
-
-Returns hourly weather forecast data.
-
-### Default
-
-24 hours
-
-### Example
-
-GET /forecast/hourly/Bengaluru
-
-### Custom number of hours
-
-GET /forecast/hourly/Bengaluru?hours=48
-
-### Maximum
-
-168 hours
-
-### Example response structure
-
-[
-    {
-        "city": "Bengaluru",
-        "state": "Karnataka",
-        "country": "India",
-        "forecast_time": "...",
-        "temperature_c": 25.0,
-        "humidity_percent": 70,
-        "precipitation_mm": 0.0,
-        "rain_mm": 0.0,
-        "weather_code": 1,
-        "wind_speed_kmh": 10.0,
-        "wind_direction_degree": 180
-    }
-]
-
-### Useful for
-
-- Hourly forecast charts
-- Rain prediction
-- Temperature graphs
-- Frontend forecast screens
-- AI weather explanations
-
----
-
-# 7. Daily Forecast
-
-## Endpoint
-
-GET /forecast/daily/{city}
-
-### Purpose
-
-Returns daily forecast information.
-
-### Default
-
-7 days
-
-### Example
-
-GET /forecast/daily/Bengaluru
-
-### Custom number of days
-
-GET /forecast/daily/Bengaluru?days=3
-
-### Maximum
-
-7 days
-
-### Example response structure
-
-[
-    {
-        "city": "Bengaluru",
-        "state": "Karnataka",
-        "country": "India",
-        "forecast_date": "...",
-        "temperature_max_c": 28.0,
-        "temperature_min_c": 20.0,
-        "apparent_temperature_max_c": 29.0,
-        "apparent_temperature_min_c": 20.0,
-        "precipitation_sum_mm": 5.0,
-        "rain_sum_mm": 4.0,
-        "weather_code": 61
-    }
-]
-
-### Useful for
-
-- 7-day forecast
-- Daily weather cards
-- Rain forecasts
-- AI-generated daily summaries
-- Frontend dashboards
-
----
-
-# 8. Combined Forecast
-
-## Endpoint
-
-GET /forecast/{city}
-
-### Purpose
-
-Returns both hourly and daily forecast data.
-
-### Example
-
-GET /forecast/Bengaluru
-
-### Response structure
-
-{
-    "city": "Bengaluru",
-
-    "hourly_forecast": [
-        {
-            "forecast_time": "...",
-            "temperature_c": 25.0,
-            "humidity_percent": 70,
-            "precipitation_mm": 0.0,
-            "rain_mm": 0.0,
-            "weather_code": 1,
-            "wind_speed_kmh": 10.0,
-            "wind_direction_degree": 180
-        }
-    ],
-
-    "daily_forecast": [
-        {
-            "forecast_date": "...",
-            "temperature_max_c": 28.0,
-            "temperature_min_c": 20.0,
-            "apparent_temperature_max_c": 29.0,
-            "apparent_temperature_min_c": 20.0,
-            "precipitation_sum_mm": 5.0,
-            "rain_sum_mm": 4.0,
-            "weather_code": 61
-        }
-    ]
-}
-
-### Data returned
-
-- Up to 168 hourly records
-- Up to 7 daily records
-
-### Useful for
-
-- Complete weather dashboard
-- Chatbot
-- AI processing
-- Frontend
-- Weather reports
-
----
-
-# 9. Weather Summary
-
-## Endpoint
-
-GET /weather/summary/{city}
-
-### Purpose
-
-Returns current weather together with today's forecast.
-
-### Example
-
-GET /weather/summary/Bengaluru
-
-### Response structure
-
-{
-    "city": "Bengaluru",
-    "state": "Karnataka",
-    "country": "India",
-
-    "current_weather": {
-        "recorded_at": "...",
-        "temperature_c": 25.0,
-        "humidity_percent": 70,
-        "apparent_temperature_c": 26.0,
-        "rain_mm": 0.0,
-        "weather_code": 1,
-        "wind_speed_kmh": 10.0
-    },
-
-    "today_forecast": {
-        "forecast_date": "...",
-        "temperature_max_c": 28.0,
-        "temperature_min_c": 20.0,
-        "precipitation_sum_mm": 5.0,
-        "rain_sum_mm": 4.0,
-        "weather_code": 61
-    }
-}
-
-### Useful for
-
-- Chatbot responses
-- AI-generated summaries
-- Voice assistant
-- Weather overview
-- Frontend summary cards
-
----
-
-# 10. Supported Cities
-
-Currently supported:
-
-1. Bengaluru
-2. Mumbai
-3. Delhi
-4. Chennai
-5. Hyderabad
-
-City names are case-insensitive.
-
-Examples:
-
-/weather/current/Bengaluru
-
-/weather/current/bengaluru
-
-/weather/current/BENGALURU
-
-All refer to the same city.
-
----
-
-# 11. Error Responses
-
-## Unknown city
-
-Example:
-
-GET /weather/current/ABC
-
-Response:
-
-404
-
-{
-    "detail": "Current weather not found"
-}
-
----
-
-## Invalid hourly forecast range
-
-Example:
-
-GET /forecast/hourly/Bengaluru?hours=200
-
-Response:
-
-400
-
-{
-    "detail": "hours must be between 1 and 168"
-}
-
----
-
-## Invalid daily forecast range
-
-Example:
-
-GET /forecast/daily/Bengaluru?days=10
-
-Response:
-
-400
-
-{
-    "detail": "days must be between 1 and 7"
-}
-
----
-
-# 12. API Usage with Python
-
-Example:
-
-import requests
-
-url = "http://127.0.0.1:8000/weather/current/Bengaluru"
-
-response = requests.get(url)
-
-data = response.json()
-
-print(data)
-
-
----
-
-# 13. Example for the Chatbot
-
-A chatbot can request:
-
-GET /weather/summary/Bengaluru
-
-Then use the returned information to generate a natural-language response.
-
-Example flow:
-
-User:
-
-"What is the weather in Bengaluru?"
-
-Chatbot:
-
-1. Identify location = Bengaluru
-2. Call WeatherGPT API
-3. Receive weather JSON
-4. Send relevant information to AI model
-5. Generate natural-language answer
-
----
-
-# 14. Example for Frontend
-
-The frontend can request:
-
-GET /forecast/Bengaluru
-
-The frontend can then use:
-
-hourly_forecast
-
-for hourly charts.
-
-It can use:
-
-daily_forecast
-
-for 7-day forecast cards.
-
----
-
-# 15. Important Note About Localhost
-
-The current API uses:
-
-http://127.0.0.1:8000
-
-This means the API is running on the computer where FastAPI is started.
-
-Other team members cannot access your localhost directly from their own computers.
-
-For the final project, the API can later be deployed to a server/cloud platform.
-
----
-
-# 16. Swagger Documentation
-
-FastAPI automatically provides interactive API documentation.
-
----
-
-# 17. Multilingual Weather Chatbot
-
-The chatbot endpoint understands the question with OpenAI, looks up weather data
-from the existing PostgreSQL tables, and generates an answer grounded in that
-data. It supports current conditions, daily forecasts, and hourly forecasts.
-
-Set `OPENAI_API_KEY` in your `.env` file. `OPENAI_MODEL` is optional and defaults
-to `gpt-4o-mini`. The database connection continues to use the existing
-`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` settings.
-
-Start the API from the project root:
-
-```powershell
-uvicorn backend.main:app --reload
-```
-
-Send a question:
-
-```http
-POST /chat
-Content-Type: application/json
-```
-
-```json
-{
-  "message": "What will the weather be in Bengaluru tomorrow?"
-}
-```
+Lightweight health check used by the Vue frontend.
 
 Example response:
 
 ```json
 {
-  "answer": "Tomorrow in Bengaluru, expect ..."
+  "status": "ok",
+  "service": "WeatherGPT API"
 }
 ```
 
-The chatbot reads locations from `locations`, current conditions from
-`weather_data`, and forecasts from `hourly_forecast` and `daily_forecast`.
-Forecast questions return only information present in those tables; missing or
-out-of-range forecast data is not fabricated. Use `/docs` to try the endpoint.
-For questions about current heavy-rain risk, the chatbot also uses the existing
-`sahana/models/heavy_rain_model.pkl` classifier with its training features and
-threshold. The model score is an estimate (not a calibrated probability), only
-for current conditions, and not a future forecast.
+## Locations
 
-Open:
+### `GET /locations`
 
-http://127.0.0.1:8000/docs
+Returns location records, including coordinates.
 
-From there, team members can:
+### `GET /cities`
 
-- See all endpoints
-- Enter city names
-- Enter hours/days
-- Execute API requests
-- View JSON responses
+Returns the supported cities and their count. Current project locations include Bengaluru, Mumbai, Delhi, Chennai, and Hyderabad, depending on the database contents.
 
----
+## Current weather
 
-# 17. Weather Data Flow
+### `GET /weather/current/{city}`
 
-Open-Meteo
-    ↓
-Python weather API module
-    ↓
-PostgreSQL
-    ↓
-FastAPI
-    ↓
-WeatherGPT AI / Frontend / Analytics
+Returns the latest stored current-weather record for a city.
 
----
+Example: `GET /weather/current/Bengaluru`
 
-# 18. Person 1 Responsibilities
+Fields include city, state, country, recorded time, temperature, humidity, apparent temperature, precipitation, rain, weather code, cloud cover, wind speed, and wind direction.
 
-Person 1 is responsible for:
+## Forecasts
 
-- Weather API data collection
-- Data cleaning
-- Data validation
-- PostgreSQL storage
-- Historical weather data
-- Forecast data
-- FastAPI endpoints
-- API documentation
+### `GET /forecast/hourly/{city}?hours=24`
 
-Other team members should use the API rather than directly modifying the database.
+Returns hourly forecast records. The backend validates the requested range; the documented maximum is 168 hours.
 
----
+### `GET /forecast/daily/{city}?days=7`
 
-# 19. Main API Endpoints
+Returns daily forecast records. The documented maximum is 7 days.
 
-| Endpoint | Purpose |
-|---|---|
-| / | API health check |
-| /cities | List supported cities |
-| /weather/current/{city} | Current weather |
-| /forecast/hourly/{city} | Hourly forecast |
-| /forecast/daily/{city} | Daily forecast |
-| /forecast/{city} | Hourly + daily forecast |
-| /weather/summary/{city} | Current weather + today's forecast |
+### `GET /forecast/{city}`
 
----
+Returns combined hourly and daily forecast data.
 
-# 20. API Status
+### `GET /weather/summary/{city}`
 
-WeatherGPT Weather Data API
+Returns the latest current-weather record and the first available daily forecast record for the city.
 
-Status: Development version
+## Chatbot
 
-Data source: Open-Meteo
+### `POST /chat`
 
-Database: PostgreSQL
+The chatbot extracts the requested city/date/forecast type/language, retrieves weather data from PostgreSQL, optionally retrieves relevant reference chunks from pgvector, and generates a grounded answer through OpenRouter.
 
-Backend: FastAPI
-
-Supported locations: Bengaluru, Mumbai, Delhi, Chennai, Hyderabad
-
----
-
-# 21. WeatherGPT Chatbot + RAG
-
-## POST /chat
-
-The chatbot extracts the city, requested date, forecast type, and answer language.
-It retrieves weather records from the existing PostgreSQL tables, then searches
-the `weather_documents` pgvector table for relevant reference material. The LLM
-combines these sources to answer the question.
-
-### Request
+Request:
 
 ```json
 {
   "message": "Will it rain in Bengaluru tomorrow?",
   "history": [
-    {"role": "user", "content": "What's the weather in Bengaluru?"},
-    {"role": "assistant", "content": "The latest stored conditions are ..."}
+    { "role": "user", "content": "What's the weather in Bengaluru?" },
+    { "role": "assistant", "content": "..." }
   ]
 }
 ```
 
-`history` is optional and supports up to 12 prior user/assistant messages. Send
-the newest question in `message`.
+- `message`: required, 1–2,000 characters.
+- `history`: optional; up to 12 previous messages, each with `role` (`user` or `assistant`) and `content`.
 
-### Response
+Response:
 
 ```json
 {
   "answer": "The generated weather answer...",
   "sources": [
     {
-      "title": "India Weather Warnings",
+      "title": "India weather guidance",
       "source": "knowledge_base/india_weather_warnings.md",
-      "similarity": 0.78
+      "similarity": 0.72
     }
   ]
 }
 ```
 
-The `sources` array contains reference-document chunks retrieved from pgvector.
-Weather observations and forecasts continue to come from `weather_data`,
-`hourly_forecast`, and `daily_forecast`; RAG documents are not live forecasts.
+`similarity` is the vector-search similarity score for a retrieved reference chunk. Sources are omitted when no sufficiently relevant reference chunks are found. Weather facts continue to come from the weather tables, not from the reference documents.
 
 ## RAG setup
 
-Run once from the project root:
+Configure `DATABASE_URL`, `OPENROUTER_API_KEY`, and (optionally) `OPENROUTER_EMBEDDING_MODEL` in the backend environment. Then run from the repository root:
 
 ```bash
 python -m backend.setup_rag
 python -m backend.ingest_documents --path knowledge_base
 ```
 
-Neon must have the PostgreSQL `vector` extension enabled. The project uses
-`text-embedding-3-small` (1536 dimensions) by default. If you change the embedding
-model/dimension, update the SQL column dimension and re-ingest every document.
+`RAG_MIN_SIMILARITY` controls the minimum cosine-similarity score returned to the chatbot; its default is `0.25`. Tune it based on observed retrieval quality for the selected embedding model. Re-ingest documents if the embedding model or vector dimensions change.
 
-Supported ingestion formats: Markdown (`.md`), text (`.txt`), and CSV (`.csv`).
+## Frontend integration
 
-## Built-in chat interface
+The Vue 3 + Vite frontend is located in `frontend/` and runs independently on `http://localhost:5173` during development. It calls:
 
-Start FastAPI and open:
+- `GET /health` for the connection indicator.
+- `POST /chat` for chatbot messages.
 
-http://127.0.0.1:8000/app
+Set `VITE_API_BASE_URL` in `frontend/.env` to the backend base URL. Add the frontend's origin to the backend `FRONTEND_ORIGINS` environment variable. The frontend is not served by FastAPI; deploy its Vite `dist/` directory to a static hosting provider.
 
-The interface sends conversation history to `POST /chat` and displays retrieved
-document titles with the answer.
+## Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL/Neon connection string |
+| `OPENROUTER_API_KEY` | OpenRouter chat and embedding API key |
+| `OPENROUTER_MODEL` | Chat model; defaults to `openrouter/free` |
+| `OPENROUTER_EMBEDDING_MODEL` | Embedding model used for RAG |
+| `RAG_MIN_SIMILARITY` | Minimum RAG similarity; defaults to `0.25` |
+| `FRONTEND_ORIGINS` | Comma-separated allowed frontend origins |
+| `VITE_API_BASE_URL` | Frontend-only backend URL; set in `frontend/.env` |
+
+Never put database credentials or the OpenRouter API key in frontend variables.

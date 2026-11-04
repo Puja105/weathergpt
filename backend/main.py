@@ -2,8 +2,6 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 from backend.database import get_connection
 from backend.chatbot import router as chatbot_router
 
@@ -642,7 +640,7 @@ def get_weather_summary(city: str):
         cursor.close()
         connection.close()
 
-# The built-in chat UI is served by the same FastAPI app.
-FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
-if FRONTEND_DIR.is_dir():
-    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+@app.get("/health")
+def health_check():
+    """Lightweight health endpoint for frontend/deployment checks."""
+    return {"status": "ok", "service": "WeatherGPT API"}

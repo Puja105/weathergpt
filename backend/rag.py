@@ -240,8 +240,16 @@ def ingest_chunks(
 def retrieve_documents(
     question: str,
     limit: int = 5,
+    min_similarity: float | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve the most semantically relevant document chunks."""
+    """Retrieve relevant chunks, filtering weak matches and exact duplicates.
+
+    RAG_MIN_SIMILARITY can tune the cosine-similarity cutoff for the project's
+    embedding model. A conservative default prevents unrelated documents from
+    being presented as evidence.
+    """
+    if min_similarity is None:
+        min_similarity = float(os.getenv("RAG_MIN_SIMILARITY", "0.25"))
 
     query_vectors = create_embeddings(
         [question],
@@ -276,19 +284,28 @@ def retrieve_documents(
 
         rows = cursor.fetchall()
 
-        return [
-            {
+        relevant_documents = []
+        seen_content = set()
+
+        for row in rows:
+            similarity = float(row[3]) if row[3] is not None else None
+
+            if similarity is None or similarity < min_similarity:
+                continue
+
+            normalized_content = " ".join(str(row[2]).lower().split())
+            if normalized_content in seen_content:
+                continue
+
+            seen_content.add(normalized_content)
+            relevant_documents.append({
                 "title": row[0],
                 "source": row[1],
                 "content": row[2],
-                "similarity": (
-                    round(float(row[3]), 4)
-                    if row[3] is not None
-                    else None
-                ),
-            }
-            for row in rows
-        ]
+                "similarity": round(similarity, 4),
+            })
+
+        return relevant_documents
 
     except Exception as error:
         if connection is not None:

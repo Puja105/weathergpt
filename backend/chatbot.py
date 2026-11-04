@@ -331,7 +331,7 @@ def calculate_rainfall_comparison(
         "highest": highest,
         "lowest": lowest,
         "average_mm": round(average, 2),
-        "cities_compared": len(rainfall_data)
+        "cities_compared": len(rainfall_data),
     }
 
 
@@ -632,11 +632,14 @@ def _generate_answer(
                 "When multiple cities are requested, answer for every city in "
                 "weather_results independently. Never claim a city's data is missing "
                 "if its weather values are present in weather_results. "
-                "When rainfall_comparison is present, use its precomputed highest, "
-                "lowest, and average values for comparisons. Do not recalculate these "
-                "values yourself. Include all cities tied for the highest or lowest "
-                "value. Identify whether the comparison is for rain or precipitation. "
-                "Only present a comparison when the user asks for one. "
+                "When rainfall_comparison is present, use its precomputed values. "
+                "Do not recalculate them. Include all cities tied for highest or lowest. "
+                "The cities_compared field tells you how many cities have usable data. "
+                "If fewer than two cities have usable data, do not claim a highest, "
+                "lowest, or meaningful comparison; report the available data and say "
+                "the comparison is incomplete. Keep rain and precipitation distinct: "
+                "rain is not interchangeable with total precipitation. Identify the "
+                "requested metric. Only present a comparison when asked. "
                 "Cite relevant "
                 "reference material by its title in square brackets, for example [IMD "
                 "Warning Guide], and do not claim to have used a source not supplied. "
@@ -685,10 +688,17 @@ def chat(request: ChatRequest) -> ChatResponse:
 
     # Keep the weather chatbot usable before the first document ingestion.
     # Once the RAG table is created, retrieval returns matching chunks.
-    retrieval_query = " ".join(
-        [item.content for item in request.history[-4:] if item.role == "user"]
-        + [request.message]
+    # Use the latest question by default. For short follow-ups, include only the
+    # immediately preceding user question so stale topics do not pollute retrieval.
+    latest_question = request.message.strip()
+    previous_user_question = next(
+        (item.content for item in reversed(request.history) if item.role == "user"),
+        "",
     )
+    if len(latest_question.split()) <= 5 and previous_user_question:
+        retrieval_query = f"{previous_user_question} {latest_question}"
+    else:
+        retrieval_query = latest_question
     try:
         retrieved_documents = retrieve_documents(retrieval_query, limit=5)
     except HTTPException as error:
