@@ -47,6 +47,8 @@ class WeatherIntent(BaseModel):
     query_type: Literal["current", "daily", "hourly"] = "current"
     language: str = "English"
     include_heavy_rain_risk: bool = False
+    is_weather_related: bool = False
+    rainfall_metric: Literal["rain", "precipitation"] = "rain"
 
 
 def _request_openai(messages: list[dict[str, str]], json_response: bool = False) -> str:
@@ -106,6 +108,7 @@ def _request_openai(messages: list[dict[str, str]], json_response: bool = False)
 
     return content
 
+
 def _understand_question(
     message: str,
     history: Optional[list[ChatMessage]] = None
@@ -120,11 +123,15 @@ def _understand_question(
                 "Extract weather request details from the latest user message. "
                 "Return JSON with these fields: "
                 "cities (a list of all requested city names; empty list if absent), "
+                "is_weather_related (true if the question is about weather, "
+                "weather forecasts, climate, weather science, weather safety, "
+                "or weather-related follow-ups; false for unrelated topics), "
                 "date (YYYY-MM-DD or null), "
                 "query_type (MUST be exactly current, daily, or hourly; NEVER null), "
-                "language (the language to use in the answer), and "
+                "language (the language to use in the answer), "
                 "include_heavy_rain_risk (true only when the user asks about "
-                "current heavy-rain risk, never for a future forecast). "
+                "current heavy-rain risk, never for a future forecast), "
+                "rainfall_metric (exactly 'rain' or 'precipitation'). "
 
                 f"Today's date is {today}. "
                 "Resolve relative dates using today's date. "
@@ -133,15 +140,30 @@ def _understand_question(
                 "and daily for a date or daily outlook. "
                 "If uncertain, always choose current. "
 
-                "IMPORTANT: Extract EVERY city mentioned in the question. "
+                "Extract EVERY city mentioned in the question. "
                 "For comparisons, include all cities in the cities list. "
                 "For example, 'Compare Bengaluru and Mumbai' must produce "
                 "cities: ['Bengaluru', 'Mumbai']. "
 
-                "Use prior conversation turns to resolve follow-ups such as "
-                "'what about tomorrow?' and pronouns. "
-                "Do not invent a city if it is absent from both the latest "
-                "message and conversation history."
+                "Use prior conversation turns to resolve follow-ups and pronouns. "
+                "Do not invent a city if it is absent from the message and history. "
+
+                "Classify general weather-education questions such as "
+                "'What is humidity?', 'Why does it rain?', and "
+                "'What causes cyclones?' as weather-related, even without "
+                "a city or live forecast. "
+
+                "Classify programming, mathematics, general knowledge, "
+                "and other non-weather topics as not weather-related. "
+
+                "For follow-ups, use conversation history to determine "
+                "whether they belong to a weather-related conversation. "
+
+                "Use 'rain' for rain or rainfall questions. "
+                "Use 'precipitation' for explicit precipitation questions. "
+                "If neither is mentioned, use 'rain'. "
+
+                "Always return every required field with the correct type."
             ),
         }
     ]
@@ -157,42 +179,161 @@ def _understand_question(
         "content": message
     })
 
-    content = _request_openai(messages, json_response=True)
+    # Allow one retry if the model returns invalid details.
+    for attempt in range(2):
 
-    try:
-        data = json.loads(content)
+        content = _request_openai(messages, json_response=True)
 
-        # Support older responses that use the singular "city" field.
-        if "cities" not in data:
-            old_city = data.get("city")
-            data["cities"] = [old_city] if old_city else []
+        try:
+            data = json.loads(content)
 
-        # Normalize the cities field.
-        if data["cities"] is None:
-            data["cities"] = []
-        elif isinstance(data["cities"], str):
-            data["cities"] = [data["cities"]]
+            if not isinstance(data, dict):
+                raise ValueError("Expected a JSON object.")
 
-        # Remove empty names and duplicate cities.
-        data["cities"] = list(dict.fromkeys(
-            city.strip()
-            for city in data["cities"]
-            if isinstance(city, str) and city.strip()
-        ))
+            # Support older responses using the singular "city" field.
+            if "cities" not in data:
+                old_city = data.get("city")
+                data["cities"] = [old_city] if old_city else []
 
-        if data.get("query_type") is None:
-            data["query_type"] = "current"
+            # Normalize the cities field.
+            if data["cities"] is None:
+                data["cities"] = []
+            elif isinstance(data["cities"], str):
+                data["cities"] = [data["cities"]]
 
-        return WeatherIntent.model_validate(data)
+            if not isinstance(data["cities"], list):
+                raise ValueError("The cities field must be a list.")
 
-    except (ValidationError, json.JSONDecodeError, AttributeError, TypeError) as error:
+            data["cities"] = list(dict.fromkeys(
+                city.strip()
+                for city in data["cities"]
+                if isinstance(city, str) and city.strip()
+            ))
 
-        logger.exception("OpenRouter returned invalid weather request details")
+            # Do not silently default this field to False.
+            # Doing so could incorrectly reject a valid weather question.
+            if "is_weather_related" not in data:
+                raise ValueError("Missing is_weather_related field.")
 
-        raise HTTPException(
-            status_code=502,
-            detail="The language model returned invalid weather request details."
-        ) from error
+            if data.get("query_type") is None:
+                data["query_type"] = "current"
+
+            if not data.get("rainfall_metric"):
+                data["rainfall_metric"] = "rain"
+
+            return WeatherIntent.model_validate(data)
+
+        except (
+            ValidationError,
+            json.JSONDecodeError,
+            AttributeError,
+            TypeError,
+            ValueError
+        ) as error:
+
+            logger.warning(
+                "Invalid weather intent response (attempt %s/2): %s",
+                attempt + 1,
+                error
+            )
+
+            if attempt == 0:
+                messages.append({
+                    "role": "assistant",
+                    "content": content
+                })
+
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Your previous response was invalid. "
+                        "Return a corrected JSON object containing every "
+                        "required field with the correct types. "
+                        "Do not include explanations or markdown."
+                    )
+                })
+
+    logger.error("OpenRouter failed to return valid weather intent after 2 attempts.")
+
+    raise HTTPException(
+        status_code=502,
+        detail=(
+            "WeatherGPT could not understand the request. "
+            "Please try again."
+        )
+    )
+
+
+
+def classify_daily_rainfall(rainfall_mm: float) -> str:
+
+    if rainfall_mm <= 0:
+        return "No rain"
+    elif rainfall_mm < 2.5:
+        return "Very light rainfall"
+    elif rainfall_mm <= 15.5:
+        return "Light rainfall"
+    elif rainfall_mm <= 64.4:
+        return "Moderate rainfall"
+    elif rainfall_mm <= 115.5:
+        return "Heavy rainfall"
+    elif rainfall_mm <= 204.4:
+        return "Very heavy rainfall"
+    else:
+        return "Extremely heavy rainfall"
+
+
+
+def calculate_rainfall_comparison(
+    weather_results: list[dict[str, object]]
+) -> dict[str, object]:
+
+    rainfall_data = []
+
+    for result in weather_results:
+        weather = result.get("weather")
+        location = result.get("location")
+
+        if not isinstance(weather, dict) or not isinstance(location, dict):
+            continue
+
+        amount = weather.get("requested_amount_mm")
+
+        if amount is None:
+            continue
+
+        rainfall_data.append({
+            "city": location["city"],
+            "amount_mm": float(amount)
+        })
+
+    if not rainfall_data:
+        return {}
+
+    highest_amount = max(item["amount_mm"] for item in rainfall_data)
+    lowest_amount = min(item["amount_mm"] for item in rainfall_data)
+
+    highest = [
+        item for item in rainfall_data
+        if item["amount_mm"] == highest_amount
+    ]
+
+    lowest = [
+        item for item in rainfall_data
+        if item["amount_mm"] == lowest_amount
+    ]
+
+    average = sum(
+        item["amount_mm"] for item in rainfall_data
+    ) / len(rainfall_data)
+
+    return {
+        "highest": highest,
+        "lowest": lowest,
+        "average_mm": round(average, 2),
+        "cities_compared": len(rainfall_data)
+    }
+
 
 def _get_weather_context(intent: WeatherIntent) -> dict[str, object]:
 
@@ -413,15 +554,40 @@ def _get_weather_context(intent: WeatherIntent) -> dict[str, object]:
 
                 weather = dict(zip(columns, row)) if row else None
 
+                if weather:
+                    if intent.rainfall_metric == "precipitation":
+                        weather["requested_amount_mm"] = weather["precipitation_sum_mm"]
+                    else:
+                        weather["requested_amount_mm"] = weather["rain_sum_mm"]
+
+                    weather["requested_metric"] = intent.rainfall_metric
+
+                    if (
+                        intent.rainfall_metric == "rain"
+                        and weather["rain_sum_mm"] is not None
+                    ):
+                        weather["rainfall_category"] = classify_daily_rainfall(
+                            weather["rain_sum_mm"]
+                        )
+
                 context["weather"] = weather
 
             weather_results.append(context)
 
-        return {
+        result_context = {
             "query_type": intent.query_type,
             "requested_date": requested_date.isoformat(),
             "weather_results": weather_results
         }
+
+        if intent.query_type == "daily" and len(intent.cities) > 1:
+            comparison = calculate_rainfall_comparison(weather_results)
+
+            if comparison:
+                comparison["metric"] = intent.rainfall_metric
+                result_context["rainfall_comparison"] = comparison
+
+        return result_context
 
     except psycopg2.Error as error:
 
@@ -466,6 +632,11 @@ def _generate_answer(
                 "When multiple cities are requested, answer for every city in "
                 "weather_results independently. Never claim a city's data is missing "
                 "if its weather values are present in weather_results. "
+                "When rainfall_comparison is present, use its precomputed highest, "
+                "lowest, and average values for comparisons. Do not recalculate these "
+                "values yourself. Include all cities tied for the highest or lowest "
+                "value. Identify whether the comparison is for rain or precipitation. "
+                "Only present a comparison when the user asks for one. "
                 "Cite relevant "
                 "reference material by its title in square brackets, for example [IMD "
                 "Warning Guide], and do not claim to have used a source not supplied. "
@@ -499,6 +670,17 @@ def _generate_answer(
 @router.post("", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
     intent = _understand_question(request.message, request.history)
+    
+    if not intent.is_weather_related:
+        return ChatResponse(
+            answer=(
+                "I'm WeatherGPT, so I can only help with weather-related "
+                "questions, forecasts, climate, and weather safety. "
+                "Feel free to ask me something about the weather!"
+            ),
+            sources=[]
+        )
+    
     weather_context = _get_weather_context(intent)
 
     # Keep the weather chatbot usable before the first document ingestion.
@@ -530,4 +712,5 @@ def chat(request: ChatRequest) -> ChatResponse:
         )
         for document in retrieved_documents
     ]
+
     return ChatResponse(answer=answer, sources=sources)
