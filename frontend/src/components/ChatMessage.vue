@@ -1,11 +1,26 @@
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+})
+
+const props = defineProps({
   message: {
     type: Object,
     required: true,
   },
 })
+
+const formattedContent = computed(() =>
+  DOMPurify.sanitize(
+    marked.parse(String(props.message.content || ''))
+  )
+)
 </script>
 
 <template>
@@ -31,8 +46,11 @@ defineProps({
 
       <!-- MESSAGE TEXT -->
       <div class="message-bubble">
-        <p>{{ message.content }}</p>
-      </div>
+      <div
+        class="markdown-content"
+        v-html="formattedContent"
+      ></div>
+    </div>
 
       <!-- SOURCE REFERENCES -->
       <div
@@ -149,9 +167,78 @@ defineProps({
   overflow-wrap: anywhere;
 }
 
-.message-bubble p {
+.plain-message {
   margin: 0;
   white-space: pre-wrap;
+}
+
+.markdown-content {
+  overflow-wrap: anywhere;
+}
+
+.markdown-content :deep(:first-child) {
+  margin-top: 0;
+}
+
+.markdown-content :deep(:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-content :deep(p) {
+  margin: 0 0 9px;
+  white-space: normal;
+}
+
+.markdown-content :deep(strong) {
+  font-weight: 800;
+  color: inherit;
+}
+
+.markdown-content :deep(em) {
+  font-style: italic;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  margin: 6px 0 10px;
+  padding-left: 21px;
+}
+
+.markdown-content :deep(li) {
+  margin: 3px 0;
+}
+
+.markdown-content :deep(h1),
+.markdown-content :deep(h2),
+.markdown-content :deep(h3) {
+  margin: 10px 0 6px;
+  font-size: 1.05em;
+  line-height: 1.45;
+}
+
+.markdown-content :deep(code) {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(90, 110, 130, 0.12);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.markdown-content :deep(pre) {
+  overflow-x: auto;
+  padding: 9px;
+  border-radius: 7px;
+  background: rgba(30, 45, 60, 0.08);
+}
+
+.markdown-content :deep(blockquote) {
+  margin: 8px 0;
+  padding-left: 10px;
+  border-left: 3px solid #8da9c4;
+}
+
+.markdown-content :deep(a) {
+  color: inherit;
+  text-decoration: underline;
 }
 
 .message-row.user .message-bubble {

@@ -10,8 +10,9 @@ import {
 
 import ChatMessage from './components/ChatMessage.vue'
 
-const API_BASE = 'http://127.0.0.1:8000'
-//const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+).replace(/\/$/, '')
 
 const messages = ref([
   {
@@ -29,6 +30,7 @@ const apiOnline = ref(false)
 const errorMessage = ref('')
 const voiceError = ref('')
 const listening = ref(false)
+const voiceLanguage = ref('en-IN')
 const chatOpen = ref(false)
 const activePage = ref('home')
 
@@ -324,7 +326,7 @@ function setupSpeechRecognition() {
 
   recognition = new SpeechRecognition()
 
-  recognition.lang = 'en-IN'
+  recognition.lang = voiceLanguage.value
   recognition.continuous = false
   recognition.interimResults = true
   recognition.maxAlternatives = 1
@@ -390,6 +392,7 @@ function toggleListening() {
   }
 
   try {
+    recognition.lang = voiceLanguage.value
     recognition.start()
   } catch (error) {
     voiceError.value = 'Unable to start voice input. Please try again.'
@@ -1023,6 +1026,23 @@ onBeforeUnmount(() => {
           <div class="composer-bottom">
 
             <div class="composer-controls">
+
+              <select
+                v-model="voiceLanguage"
+                class="voice-language"
+                :disabled="sending || listening"
+                aria-label="Voice input language"
+                title="Choose the language for voice input"
+              >
+                <option value="en-IN">English</option>
+                <option value="hi-IN">हिन्दी</option>
+                <option value="kn-IN">ಕನ್ನಡ</option>
+                <option value="ta-IN">தமிழ்</option>
+                <option value="te-IN">తెలుగు</option>
+                <option value="mr-IN">मराठी</option>
+                <option value="bn-IN">বাংলা</option>
+                <option value="ml-IN">മലയാളം</option>
+              </select>
 
               <button
                 type="button"
@@ -2073,6 +2093,22 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.voice-language {
+  max-width: 112px;
+  min-width: 88px;
+  padding: 7px 8px;
+  border: 1px solid #dce5ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #526980;
+  font-size: 11px;
+  outline: none;
+}
+
+.voice-language:focus {
+  border-color: #7899bd;
 }
 
 .mic-button,

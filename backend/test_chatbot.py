@@ -11,6 +11,12 @@ from backend import rain_risk
 
 class ChatbotTests(unittest.TestCase):
 
+    def test_common_city_aliases_resolve_to_database_names(self):
+        self.assertEqual(chatbot._normalize_city_name("Bangalore"), "bengaluru")
+        self.assertEqual(chatbot._normalize_city_name("Bombay"), "mumbai")
+        self.assertEqual(chatbot._normalize_city_name("Madras"), "chennai")
+        self.assertEqual(chatbot._normalize_city_name("New Delhi"), "delhi")
+
     def test_understand_question_parses_multilingual_intent(self):
         with patch.object(
             chatbot,

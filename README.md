@@ -24,6 +24,7 @@ It is built with **FastAPI + PostgreSQL/Neon** on the backend and **Vue 3 + Vite
 - [Troubleshooting](#troubleshooting)
 - [Deployment handoff](#deployment-handoff)
 - [Security notes](#security-notes)
+- [Regional language support](#regional-language-support)
 
 ---
 
@@ -742,6 +743,92 @@ Vite variables prefixed with `VITE_` are included in the browser bundle. They mu
 - Use HTTPS for deployed frontend and backend communication.
 - Restrict production CORS to the actual frontend domain rather than allowing every origin.
 - Do not commit `.venv/`, `node_modules/`, or generated build output unless the project specifically requires it.
+
+---
+
+### **Regional language support**
+
+WeatherGPT supports questions in English and several Indian regional languages. Users can also select their preferred language for voice input using the language selector beside the microphone.
+
+Supported languages include:
+
+- English
+- Hindi
+- Kannada
+- Tamil
+- Telugu
+- Marathi
+- Bengali
+- Malayalam
+
+**Example questions**
+
+**Hindi**
+
+```text
+आज मुंबई का मौसम कैसा है?
+क्या कल बेंगलुरु में बारिश होगी?
+```
+
+**Kannada**
+
+```text
+ಬೆಂಗಳೂರಿನ ಹವಾಮಾನ ಹೇಗಿದೆ?
+ನಾಳೆ ಮೈಸೂರಿನಲ್ಲಿ ಮಳೆಯಾಗುತ್ತದೆಯೇ?
+```
+
+**Tamil**
+
+```text
+சென்னையின் வானிலை எப்படி இருக்கிறது?
+நாளை மழை பெய்யுமா?
+```
+
+**Telugu**
+
+```text
+హైదరాబాద్‌లో వాతావరణం ఎలా ఉంది?
+రేపు వర్షం పడుతుందా?
+```
+
+**Marathi**
+
+```text
+मुंबईचे हवामान कसे आहे?
+उद्या पाऊस पडेल का?
+```
+
+**Bengali**
+
+```text
+কলকাতার আবহাওয়া কেমন?
+আগামীকাল কি বৃষ্টি হবে?
+```
+
+**Malayalam**
+
+```text
+ബെംഗളൂരുവിലെ കാലാവസ്ഥ എങ്ങനെയുണ്ട്?
+നാളെ മഴ പെയ്യുമോ?
+```
+
+**Romanized speech-to-text examples**
+
+```text
+Bengaluru ka mausam kaisa hai?
+Nale Bengaluru alli male barutta?
+Chennai la inniku weather epdi irukku?
+```
+
+**Expected behavior**
+
+- Identifies the user's language when supported.
+- Attempts to respond in the same language as the question.
+- Supports regional-language questions entered as text or through voice input.
+- Allows users to select their voice input language before speaking.
+- Uses the same weather database and forecast information regardless of the language used to ask the question.
+
+**Note:** Voice recognition accuracy depends on browser support, microphone permissions, and the selected recognition language. Regional-language support does not guarantee perfect transcription or translation.
 
 ---
 
