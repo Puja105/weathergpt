@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import get_connection
 from backend.chatbot import router as chatbot_router
+from fastapi import FastAPI, HTTPException, Query
 
 
 app = FastAPI(
@@ -639,6 +640,77 @@ def get_weather_summary(city: str):
 
         cursor.close()
         connection.close()
+
+
+# ============================================================
+# FIND NEAREST SUPPORTED LOCATION
+# ============================================================
+
+@app.get("/locations/nearest")
+def get_nearest_location(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180)
+):
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                location_id,
+                city,
+                state,
+                country,
+                latitude,
+                longitude,
+                (
+                    6371 * ACOS(
+                        LEAST(
+                            1.0,
+                            GREATEST(
+                                -1.0,
+                                COS(RADIANS(%s))
+                                * COS(RADIANS(latitude))
+                                * COS(RADIANS(longitude) - RADIANS(%s))
+                                + SIN(RADIANS(%s))
+                                * SIN(RADIANS(latitude))
+                            )
+                        )
+                    )
+                ) AS distance_km
+            FROM locations
+            WHERE latitude IS NOT NULL
+              AND longitude IS NOT NULL
+            ORDER BY distance_km ASC
+            LIMIT 1;
+            """,
+            (latitude, longitude, latitude)
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="No supported weather locations found"
+            )
+
+        return {
+            "location_id": row[0],
+            "city": row[1],
+            "state": row[2],
+            "country": row[3],
+            "latitude": float(row[4]),
+            "longitude": float(row[5]),
+            "distance_km": round(float(row[6]), 2)
+        }
+
+    finally:
+        cursor.close()
+        connection.close()
+
 
 @app.get("/health")
 def health_check():

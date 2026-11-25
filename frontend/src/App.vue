@@ -9,10 +9,14 @@ import {
 } from 'vue'
 
 import ChatMessage from './components/ChatMessage.vue'
+import WeatherDashboard from './components/WeatherDashboard.vue'
 
 const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
-).replace(/\/$/, '')
+  import.meta.env.VITE_API_BASE_URL ||
+  `${window.location.protocol}//${window.location.hostname}:8000`
+).replace(/\/+$/, '')
+
+console.log("WeatherGPT API URL:", API_BASE)
 
 const messages = ref([
   {
@@ -573,6 +577,9 @@ onBeforeUnmount(() => {
 
       </section>
 
+      <!-- LOCATION-BASED WEATHER DASHBOARD -->
+      <WeatherDashboard />
+
       <!-- INTRODUCTION -->
 
       <section class="intro-section">
@@ -601,6 +608,7 @@ onBeforeUnmount(() => {
         </div>
 
       </section>
+      
 
       <!-- EXPLORE -->
 
