@@ -201,7 +201,8 @@ async function sendMessage(question = null) {
 
   await scrollToBottom()
 
-  const previousHistory = history.value.slice(-12)
+  const previousHistory = history.value.slice(-8)
+  let serverResponded = false
 
   try {
     const response = await fetch(`${API_BASE}/chat`, {
@@ -211,15 +212,25 @@ async function sendMessage(question = null) {
       },
       body: JSON.stringify({
         message: content,
-        history: previousHistory
+        history: previousHistory,
+        // The selected Indian language also controls the response language.
+        // English leaves language detection automatic for typed questions.
+        preferred_language: voiceLanguage.value === 'en-IN'
+          ? null
+          : voiceLanguage.value.split('-')[0]
       })
     })
 
-    if (!response.ok) {
-      throw new Error(`Server returned ${response.status}`)
-    }
+    serverResponded = true
+    apiOnline.value = true
+    const payload = await response.json().catch(() => ({}))
 
-    const payload = await response.json()
+    if (!response.ok) {
+      throw new Error(
+        payload.detail ||
+        `WeatherGPT request failed (${response.status}). Please try again shortly.`
+      )
+    }
 
     if (!payload.answer) {
       throw new Error('The server returned an empty response.')
@@ -252,10 +263,10 @@ async function sendMessage(question = null) {
   } catch (error) {
     console.error('Chat error:', error)
 
-    errorMessage.value =
+    errorMessage.value = error.message ||
       'Unable to connect to WeatherGPT. Please check your connection and try again.'
 
-    apiOnline.value = false
+    apiOnline.value = serverResponded
 
   } finally {
     sending.value = false
@@ -1039,8 +1050,8 @@ onBeforeUnmount(() => {
                 v-model="voiceLanguage"
                 class="voice-language"
                 :disabled="sending || listening"
-                aria-label="Voice input language"
-                title="Choose the language for voice input"
+                aria-label="Voice input and response language"
+                title="Choose voice input and response language"
               >
                 <option value="en-IN">English</option>
                 <option value="hi-IN">हिन्दी</option>

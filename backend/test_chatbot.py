@@ -11,6 +11,36 @@ from backend import rain_risk
 
 class ChatbotTests(unittest.TestCase):
 
+
+    def test_selected_language_overrides_romanized_language_detection(self):
+        with patch.object(
+            chatbot,
+            "_request_openai",
+            return_value=(
+                '{"cities":["Bengaluru"],"query_type":"current",'
+                '"language":"Tamil","is_weather_related":true}'
+            ),
+        ):
+            intent = chatbot._understand_question(
+                "ivatu male baruta",
+                preferred_language="kn",
+            )
+
+        self.assertEqual(intent.language, "Kannada")
+        self.assertEqual(intent.cities, ["Bengaluru"])
+
+    def test_rag_is_skipped_for_routine_weather_questions(self):
+        self.assertFalse(
+            chatbot._needs_reference_retrieval(
+                "What is the weather in Bengaluru today?"
+            )
+        )
+        self.assertTrue(
+            chatbot._needs_reference_retrieval(
+                "What precautions should I take during flooding?"
+            )
+        )
+
     def test_common_city_aliases_resolve_to_database_names(self):
         self.assertEqual(chatbot._normalize_city_name("Bangalore"), "bengaluru")
         self.assertEqual(chatbot._normalize_city_name("Bombay"), "mumbai")
@@ -23,7 +53,8 @@ class ChatbotTests(unittest.TestCase):
             "_request_openai",
             return_value=(
                 '{"city":"Bengaluru","date":"2026-10-10",'
-                '"query_type":"daily","language":"Kannada"}'
+                '"query_type":"daily","language":"Kannada",'
+                '"is_weather_related":true}'
             ),
         ):
             intent = chatbot._understand_question(

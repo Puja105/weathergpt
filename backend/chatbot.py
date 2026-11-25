@@ -28,6 +28,9 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     history: list[ChatMessage] = Field(default_factory=list, max_length=12)
+    preferred_language: Optional[Literal[
+        "hi", "kn", "ta", "te", "mr", "bn", "ml"
+    ]] = None
 
 
 class ChatSource(BaseModel):
@@ -64,6 +67,8 @@ def _request_openai(messages: list[dict[str, str]], json_response: bool = False)
         "model": os.getenv("OPENROUTER_MODEL", "openrouter/free"),
         "messages": messages,
         "temperature": 0.2,
+        # Keep free-tier usage predictable; intent JSON needs very few tokens.
+        "max_tokens": 350 if json_response else 700,
     }
 
     if json_response:
@@ -85,6 +90,22 @@ def _request_openai(messages: list[dict[str, str]], json_response: bool = False)
         result = response.json()
 
     except requests.RequestException as error:
+        status = (
+            error.response.status_code
+            if isinstance(error, requests.HTTPError) and error.response is not None
+            else None
+        )
+        if status in {402, 429}:
+            logger.warning("OpenRouter usage limit response: HTTP %s", status)
+            raise HTTPException(
+                status_code=status,
+                detail=(
+                    "OpenRouter reports insufficient credits or budget."
+                    if status == 402
+                    else "OpenRouter rate limit reached. Please wait before trying again."
+                ),
+            ) from error
+
         logger.exception("OpenRouter request failed")
         raise HTTPException(
             status_code=502,
@@ -136,9 +157,21 @@ def _normalize_city_name(city: str) -> str:
     return CITY_ALIASES.get(cleaned, cleaned)
 
 
+LANGUAGE_NAMES = {
+    "hi": "Hindi",
+    "kn": "Kannada",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "mr": "Marathi",
+    "bn": "Bengali",
+    "ml": "Malayalam",
+}
+
+
 def _understand_question(
     message: str,
-    history: Optional[list[ChatMessage]] = None
+    history: Optional[list[ChatMessage]] = None,
+    preferred_language: Optional[str] = None,
 ) -> WeatherIntent:
 
     today = datetime.now(WEATHER_TIMEZONE).date().isoformat()
@@ -205,10 +238,10 @@ def _understand_question(
         }
     ]
 
-    for item in (history or [])[-8:]:
+    for item in (history or [])[-4:]:
         messages.append({
             "role": item.role,
-            "content": item.content
+            "content": item.content[-600:]
         })
 
     messages.append({
@@ -257,6 +290,11 @@ def _understand_question(
 
             if not data.get("rainfall_metric"):
                 data["rainfall_metric"] = "rain"
+
+            # An explicitly selected regional language takes precedence over
+            # model language detection (especially for Latin-script transliteration).
+            if preferred_language in LANGUAGE_NAMES:
+                data["language"] = LANGUAGE_NAMES[preferred_language]
 
             return WeatherIntent.model_validate(data)
 
@@ -695,8 +733,8 @@ def _generate_answer(
             ),
         }
     ]
-    for item in (history or [])[-8:]:
-        messages.append({"role": item.role, "content": item.content})
+    for item in (history or [])[-4:]:
+        messages.append({"role": item.role, "content": item.content[-600:]})
     messages.append(
         {
             "role": "user",
@@ -715,9 +753,26 @@ def _generate_answer(
     return _request_openai(messages).strip()
 
 
+def _needs_reference_retrieval(message: str) -> bool:
+    """Use embeddings for knowledge/safety questions, not routine forecasts."""
+    text = message.casefold()
+    reference_terms = (
+        "warning", "alert", "precaution", "safety", "flood", "cyclone",
+        "humidity", "pressure", "monsoon", "climate", "explain", "why",
+        "meaning", "imd", "prepare", "precautions",
+        "ಎಚ್ಚರಿಕೆ", "ಪ್ರವಾಹ", "ಸುರಕ್ಷತೆ", "வெள்ளம்", "எச்சரிக்கை",
+        "बाढ़", "चेतावनी", "सावधानी", "तूफान",
+    )
+    return any(term in text for term in reference_terms)
+
+
 @router.post("", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
-    intent = _understand_question(request.message, request.history)
+    intent = _understand_question(
+        request.message,
+        request.history,
+        request.preferred_language,
+    )
     
     if not intent.is_weather_related:
         return ChatResponse(
@@ -744,13 +799,17 @@ def chat(request: ChatRequest) -> ChatResponse:
         retrieval_query = f"{previous_user_question} {latest_question}"
     else:
         retrieval_query = latest_question
-    try:
-        retrieved_documents = retrieve_documents(retrieval_query, limit=5)
-    except HTTPException as error:
-        if error.status_code != 503:
-            raise
-        logger.warning("RAG retrieval unavailable; answering with weather data only: %s", error.detail)
-        retrieved_documents = []
+    retrieved_documents = []
+    if not intent.cities or _needs_reference_retrieval(request.message):
+        try:
+            retrieved_documents = retrieve_documents(retrieval_query, limit=4)
+        except HTTPException as error:
+            if error.status_code not in {429, 502, 503, 504}:
+                raise
+            logger.warning(
+                "RAG retrieval unavailable; continuing without reference documents: %s",
+                error.detail,
+            )
 
     answer = _generate_answer(
         request.message,
