@@ -6,6 +6,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Any
+import time
 
 import requests
 from fastapi import HTTPException
@@ -66,11 +67,12 @@ def chunk_text(
     return chunks
 
 
+
 def create_embeddings(
     texts: list[str],
     input_type: str,
 ) -> list[list[float]]:
-    """Generate embeddings through OpenRouter."""
+    """Generate embeddings through OpenRouter with retries."""
 
     if not texts:
         return []
@@ -87,25 +89,57 @@ def create_embeddings(
         )
 
     try:
-        response = requests.post(
-            OPENROUTER_EMBEDDINGS_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:8000",
-                "X-Title": "WeatherGPT",
-            },
-            json={
-                "model": EMBEDDING_MODEL,
-                "input": texts,
-                "input_type": input_type,
-                "dimensions": EMBEDDING_DIMENSIONS,
-                "encoding_format": "float",
-            },
-            timeout=60,
-        )
+        for attempt in range(4):
+            try:
+                response = requests.post(
+                    OPENROUTER_EMBEDDINGS_URL,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "http://localhost:8000",
+                        "X-Title": "WeatherGPT",
+                    },
+                    json={
+                        "model": EMBEDDING_MODEL,
+                        "input": texts,
+                        "input_type": input_type,
+                        "dimensions": EMBEDDING_DIMENSIONS,
+                        "encoding_format": "float",
+                    },
+                    timeout=60,
+                )
 
-        response.raise_for_status()
+                response.raise_for_status()
+                break
+
+            except requests.HTTPError as error:
+                logger.error(
+                    "OpenRouter response body: %s",
+                    error.response.text if error.response else "No response"
+                )
+                status = error.response.status_code if error.response else None
+
+                if status not in {429, 500, 502, 503, 504} or attempt == 3:
+                    raise
+
+                delay = 2 ** (attempt + 1)
+                logger.warning(
+                    "OpenRouter returned %s. Retrying in %s seconds...",
+                    status,
+                    delay,
+                )
+                time.sleep(delay)
+
+            except (requests.Timeout, requests.ConnectionError):
+                if attempt == 3:
+                    raise
+
+                delay = 2 ** (attempt + 1)
+                logger.warning(
+                    "OpenRouter connection failed. Retrying in %s seconds...",
+                    delay,
+                )
+                time.sleep(delay)
 
         payload = response.json()
 
@@ -135,7 +169,6 @@ def create_embeddings(
 
     except requests.RequestException as error:
         logger.exception("OpenRouter embedding request failed")
-
         raise HTTPException(
             status_code=502,
             detail="OpenRouter embedding request failed. Check API access and model availability.",
@@ -143,7 +176,6 @@ def create_embeddings(
 
     except (KeyError, TypeError, ValueError) as error:
         logger.exception("Invalid embedding response")
-
         raise HTTPException(
             status_code=502,
             detail="OpenRouter returned an invalid embedding response.",
@@ -175,9 +207,9 @@ def ingest_chunks(
         )
 
         # Keep API batches small.
-        for batch_start in range(0, len(chunks), 64):
+        for batch_start in range(0, len(chunks), 8):
 
-            batch = chunks[batch_start:batch_start + 64]
+            batch = chunks[batch_start:batch_start + 8]
 
             vectors = create_embeddings(
                 batch,
