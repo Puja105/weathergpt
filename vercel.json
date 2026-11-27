@@ -1,0 +1,57 @@
+
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "frontend": {
+      "root": "frontend/"
+    },
+    "app": {
+      "root": "backend/",
+      "entrypoint": "main:app"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/health",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/locations",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/cities",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/chat",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/weather/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/forecast/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    }
+  ]
+}
