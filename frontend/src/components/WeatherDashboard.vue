@@ -412,7 +412,7 @@ onBeforeUnmount(() => {
   font-size: 10px;
   letter-spacing: 2px;
   font-weight: 700;
-  color: #64809a;
+  color: #e1e6ea;
 }
 
 .dashboard-heading h2 {
@@ -427,7 +427,7 @@ onBeforeUnmount(() => {
 
 .dashboard-heading p,
 .location-placeholder p {
-  color: #718399;
+  color: #e0e6ec;
   line-height: 1.7;
 }
 
