@@ -54,6 +54,7 @@ class WeatherIntent(BaseModel):
     rainfall_metric: Literal["rain", "precipitation"] = "rain"
 
 
+
 def _request_openai(messages: list[dict[str, str]], json_response: bool = False) -> str:
     api_key = os.getenv("OPENROUTER_API_KEY")
 
@@ -67,8 +68,7 @@ def _request_openai(messages: list[dict[str, str]], json_response: bool = False)
         "model": os.getenv("OPENROUTER_MODEL", "openrouter/free"),
         "messages": messages,
         "temperature": 0.2,
-        # Keep free-tier usage predictable; intent JSON needs very few tokens.
-        "max_tokens": 350 if json_response else 700,
+        "max_tokens": 1200 if json_response else 1200,
     }
 
     if json_response:
@@ -80,7 +80,7 @@ def _request_openai(messages: list[dict[str, str]], json_response: bool = False)
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:8000",
+                "HTTP-Referer": "https://weathergpt-pi-weld.vercel.app",
                 "X-Title": "WeatherGPT",
             },
             json=payload,
@@ -95,6 +95,7 @@ def _request_openai(messages: list[dict[str, str]], json_response: bool = False)
             if isinstance(error, requests.HTTPError) and error.response is not None
             else None
         )
+
         if status in {402, 429}:
             logger.warning("OpenRouter usage limit response: HTTP %s", status)
             raise HTTPException(
@@ -115,20 +116,33 @@ def _request_openai(messages: list[dict[str, str]], json_response: bool = False)
     try:
         content = result["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as error:
-        logger.error("OpenRouter returned an unexpected response structure")
+        logger.error(
+            "OpenRouter returned unexpected response structure: %s",
+            result,
+        )
         raise HTTPException(
             status_code=502,
             detail="The language model returned an invalid response.",
         ) from error
 
     if not isinstance(content, str) or not content.strip():
+        choice = result.get("choices", [{}])[0] if result.get("choices") else {}
+        message = choice.get("message", {})
+
+        logger.error(
+            "OpenRouter returned empty content. Model=%s, FinishReason=%s, Usage=%s, MessageKeys=%s",
+            result.get("model"),
+            choice.get("finish_reason"),
+            result.get("usage"),
+            list(message.keys()) if isinstance(message, dict) else None,
+        )
+
         raise HTTPException(
             status_code=502,
             detail="The language model returned an empty response.",
         )
 
     return content
-
 
 # Canonicalize common historical, alternate, and colloquial city names.
 # The database continues to store one canonical name per supported city.

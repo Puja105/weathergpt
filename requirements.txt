@@ -7,3 +7,4 @@ python-dotenv
 sqlalchemy
 joblib
 scikit-learn
+mangum

@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+.git/
+.gitignore
+lambda_package/
+frontend/
+frontend_backup/
+node_modules/
+.pytest_cache/
